@@ -1,0 +1,314 @@
+{
+  "scope": "community",
+  "name": "google-gmail",
+  "version": "1.0.0",
+  "description": "Commands to send, read and manage Gmail messages using the Gmail API",
+  "license": "MIT",
+  "tags": [
+    "google",
+    "gmail",
+    "email",
+    "mail",
+    "cli"
+  ],
+  "dependencies": [
+    "community/google-auth",
+    "aux4/curl"
+  ],
+  "system": [
+    [
+      "test:jq --version",
+      "brew:jq",
+      "linux:jq"
+    ],
+    [
+      "test:node --version",
+      "brew:node",
+      "linux:nodejs"
+    ]
+  ],
+  "profiles": [
+    {
+      "name": "main",
+      "commands": [
+        {
+          "name": "google",
+          "execute": [
+            "profile:google"
+          ],
+          "help": {
+            "text": "Google commands"
+          }
+        }
+      ]
+    },
+    {
+      "name": "google",
+      "commands": [
+        {
+          "name": "gmail",
+          "execute": [
+            "profile:google:gmail"
+          ],
+          "help": {
+            "text": "Gmail commands"
+          }
+        }
+      ]
+    },
+    {
+      "name": "google:gmail",
+      "commands": [
+        {
+          "name": "services",
+          "private": true,
+          "execute": [
+            "echo '{\"name\":\"gmail\",\"scope\":\"https://www.googleapis.com/auth/gmail.modify\",\"readonlyScope\":\"https://www.googleapis.com/auth/gmail.readonly\",\"description\":\"Send, read and manage Gmail messages\"}'"
+          ],
+          "help": {
+            "text": "Output service metadata for auth resolution"
+          }
+        },
+        {
+          "name": "send",
+          "execute": [
+            "set:rawFile=!mktemp -t aux4-gmail.XXXXXXXX",
+            "stdin:node ${packageDir}/lib/gmail.mjs mime values(to, subject, content, from, cc, bcc, html) > ${rawFile}",
+            "set:raw=!cat ${rawFile}",
+            "rm -f value(rawFile)",
+            "set:requestPath=/users/me/messages/send",
+            "set:requestUrl=${apiUrl}${requestPath}",
+            "aux4 curl auth-request --provider google param(tokenFile) --method POST --header 'Content-Type: application/json' --url value(requestUrl) --body 'object(raw, threadId)'"
+          ],
+          "help": {
+            "text": "Send an email message",
+            "variables": [
+              {
+                "name": "to",
+                "text": "Recipient email address (e.g. person@example.com)",
+                "arg": true
+              },
+              {
+                "name": "subject",
+                "text": "Message subject line",
+                "default": ""
+              },
+              {
+                "name": "content",
+                "text": "Message body. If omitted, the body is read from stdin (a pipe)",
+                "default": ""
+              },
+              {
+                "name": "from",
+                "text": "Sender email address (defaults to the authenticated account)",
+                "default": ""
+              },
+              {
+                "name": "cc",
+                "text": "Comma-separated CC recipients",
+                "default": ""
+              },
+              {
+                "name": "bcc",
+                "text": "Comma-separated BCC recipients",
+                "default": ""
+              },
+              {
+                "name": "html",
+                "text": "Send the body as HTML (text/html) instead of plain text",
+                "default": "false"
+              },
+              {
+                "name": "threadId",
+                "text": "Thread ID to attach this message to (for replies)",
+                "default": ""
+              },
+              {
+                "name": "raw",
+                "text": "Base64url-encoded RFC 2822 message, derived from the other flags",
+                "default": "",
+                "private": true
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "list",
+          "execute": [
+            "set:queryString=!Q=value(query) MAX=value(maxResults) LABELS=value(labelIds) jq -rn '[ (env.Q | select(. != \"\") | \"q=\" + (. | @uri)), (env.MAX | select(. != \"\") | \"maxResults=\" + (. | @uri)), (env.LABELS | select(. != \"\") | split(\",\") | .[] | select(. != \"\") | \"labelIds=\" + (. | @uri)) ] | if length == 0 then \"\" else \"?\" + join(\"&\") end'",
+            "set:requestUrl=${apiUrl}/users/me/messages${queryString}",
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl)"
+          ],
+          "help": {
+            "text": "List messages in the mailbox",
+            "variables": [
+              {
+                "name": "query",
+                "text": "Gmail search query (e.g. 'is:unread from:person@example.com')",
+                "default": ""
+              },
+              {
+                "name": "maxResults",
+                "text": "Maximum number of messages to return",
+                "default": ""
+              },
+              {
+                "name": "labelIds",
+                "text": "Comma-separated label IDs to filter by (e.g. INBOX,UNREAD)",
+                "default": ""
+              },
+              {
+                "name": "queryString",
+                "text": "Query string derived from --query, --maxResults and --labelIds",
+                "default": "",
+                "private": true
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get",
+          "execute": [
+            "set:requestUrl=${apiUrl}/users/me/messages/${messageId}?format=${format}",
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl)"
+          ],
+          "help": {
+            "text": "Get a single message by ID",
+            "variables": [
+              {
+                "name": "messageId",
+                "text": "The message ID to retrieve",
+                "arg": true
+              },
+              {
+                "name": "format",
+                "text": "Response format: full, metadata, minimal or raw",
+                "default": "full",
+                "options": [
+                  "full",
+                  "metadata",
+                  "minimal",
+                  "raw"
+                ]
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "trash",
+          "execute": [
+            "confirm:Move the selected message(s) to Trash? They can be restored from the Bin.",
+            "set:trashBody=!node ${packageDir}/lib/gmail.mjs trashbody values(id*)",
+            "set:requestPath=/users/me/messages/batchModify",
+            "set:requestUrl=${apiUrl}${requestPath}",
+            "aux4 curl auth-request --provider google param(tokenFile) --method POST --header 'Content-Type: application/json' --url value(requestUrl) --body param(trashBody:body)",
+            "log:Moved the selected message(s) to Trash."
+          ],
+          "help": {
+            "text": "Move one or more messages to the trash (reversible; restore from the Bin)",
+            "variables": [
+              {
+                "name": "id",
+                "text": "Message ID to move to the trash (repeatable: --id A --id B)",
+                "arg": true,
+                "multiple": true
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "labels",
+          "execute": [
+            "profile:google:gmail:labels"
+          ],
+          "help": {
+            "text": "Gmail label commands"
+          }
+        }
+      ]
+    },
+    {
+      "name": "google:gmail:labels",
+      "commands": [
+        {
+          "name": "list",
+          "execute": [
+            "set:requestPath=/users/me/labels",
+            "set:requestUrl=${apiUrl}${requestPath}",
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl)"
+          ],
+          "help": {
+            "text": "List all labels in the mailbox",
+            "variables": [
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
