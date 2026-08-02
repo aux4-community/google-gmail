@@ -1,17 +1,18 @@
 # google gmail list
 
-Part of the `core` group in `test.suite.md`. The Gmail API is replaced by a local
-echo server so the GET request and its query string can be asserted without a real
-mailbox.
+Part of the `core` group in `test.suite.md`. The Gmail API is replaced by an
+`aux4/mock` server, so the command runs against a realistic message list while the
+GET request and its query parameters are asserted with `aux4 mock verify` and
+`aux4 mock requests` — without a real mailbox.
 
 ## against a local mock API
 
 ```beforeAll
-nohup node mock-echo.js 18971 >/dev/null 2>&1 &
-for i in $(seq 1 40); do curl -s -o /dev/null http://127.0.0.1:18971/ 2>/dev/null && break; sleep 0.25; done
+aux4 aux4 pkger install aux4/mock
 ```
 
 ```afterAll
+aux4 mock stop --port 18971 2>/dev/null
 pkill -f "18971" 2>/dev/null
 ```
 
@@ -28,48 +29,69 @@ pkill -f "18971" 2>/dev/null
 }
 ```
 
-### should GET the messages resource with a bearer token
+### should return the messages list from the API
 
 ```execute
-aux4 google gmail list --tokenFile google-token.json --apiUrl http://127.0.0.1:18971
+aux4 mock start --port 18971 >/dev/null 2>&1
+sleep 1
+aux4 mock stub --port 18971 --method GET --path /users/me/messages --status 200 --body '{"messages":[{"id":"18f8a9b0c1d2e3f4","threadId":"18f8a9b0c1d2e3f4"},{"id":"18f8a9b0c1d2e3aa","threadId":"18f8a9b0c1d2e3aa"}],"nextPageToken":"09876543210","resultSizeEstimate":2}' >/dev/null 2>&1
+aux4 google gmail list --tokenFile google-token.json --apiUrl http://127.0.0.1:18971/api
 ```
 
 ```expect:partial
-"method": "GET"
+"resultSizeEstimate":2
+```
+
+### should GET the messages resource with a bearer token and no request body
+
+```execute
+aux4 mock verify --port 18971 --method GET --path /users/me/messages --header "authorization=Bearer test-access-token"
 ```
 
 ```expect:partial
-"authorization": "Bearer test-access-token"
+verify ok
 ```
 
-### should request no query string when no filters are given
+### should send no query parameters when no filters are given
 
 ```execute
-aux4 google gmail list --tokenFile google-token.json --apiUrl http://127.0.0.1:18971 | aux4 json get --path '$.path'
+aux4 mock requests --port 18971 --method GET --path /users/me/messages | aux4 json get --path '$.0.query'
+```
+
+```error:partial
+field 'query' not found
+```
+
+### should send the filters as decoded query parameters
+
+```execute
+aux4 mock reset --port 18971 --requests >/dev/null 2>&1
+aux4 google gmail list --query "is:unread from:a@b.com" --maxResults 5 --labelIds INBOX,UNREAD --tokenFile google-token.json --apiUrl http://127.0.0.1:18971/api >/dev/null 2>&1
+aux4 mock requests --port 18971 --method GET --path /users/me/messages | aux4 json get --path '$.0.query.q'
 ```
 
 ```expect
-"/users/me/messages"
+"is:unread from:a@b.com"
 ```
 
-### should url-encode the query and append maxResults and labelIds
+### should pass maxResults through as a query parameter
 
 ```execute
-aux4 google gmail list --query "is:unread from:a@b.com" --maxResults 5 --labelIds INBOX,UNREAD --tokenFile google-token.json --apiUrl http://127.0.0.1:18971 | aux4 json get --path '$.path'
+aux4 mock requests --port 18971 --method GET --path /users/me/messages | aux4 json get --path '$.0.query.maxResults'
 ```
 
 ```expect
-"/users/me/messages?q=is%3Aunread%20from%3Aa%40b.com&maxResults=5&labelIds=INBOX&labelIds=UNREAD"
+"5"
 ```
 
-### should send an empty request body
+### should pass labelIds through as a query parameter
 
 ```execute
-aux4 google gmail list --tokenFile google-token.json --apiUrl http://127.0.0.1:18971 | aux4 json get --path '$.body'
+aux4 mock requests --port 18971 --method GET --path /users/me/messages | aux4 json get --path '$.0.query.labelIds'
 ```
 
 ```expect
-null
+"UNREAD"
 ```
 
 ## without a stored token
@@ -77,7 +99,7 @@ null
 ### should report that the google provider has no token
 
 ```execute
-aux4 google gmail list --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18971
+aux4 google gmail list --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18971/api
 ```
 
 ```error:partial

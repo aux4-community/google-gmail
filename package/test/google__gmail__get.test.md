@@ -1,17 +1,18 @@
 # google gmail get
 
-Part of the `core` group in `test.suite.md`. The Gmail API is replaced by a local
-echo server so the GET request for a single message can be asserted without a real
-mailbox.
+Part of the `core` group in `test.suite.md`. The Gmail API is replaced by an
+`aux4/mock` server, so the command runs against a realistic message resource while
+the GET request for a single message (path and `format` query) is asserted with
+`aux4 mock verify` and `aux4 mock requests` — without a real mailbox.
 
 ## against a local mock API
 
 ```beforeAll
-nohup node mock-echo.js 18972 >/dev/null 2>&1 &
-for i in $(seq 1 40); do curl -s -o /dev/null http://127.0.0.1:18972/ 2>/dev/null && break; sleep 0.25; done
+aux4 aux4 pkger install aux4/mock
 ```
 
 ```afterAll
+aux4 mock stop --port 18972 2>/dev/null
 pkill -f "18972" 2>/dev/null
 ```
 
@@ -28,38 +29,59 @@ pkill -f "18972" 2>/dev/null
 }
 ```
 
+### should return the message resource for the requested id
+
+```execute
+aux4 mock start --port 18972 >/dev/null 2>&1
+sleep 1
+aux4 mock stub --port 18972 --method GET --path /users/me/messages/{id} --status 200 --body '{"id":"${path.id}","threadId":"18f8a9b0c1d2e3f4","labelIds":["INBOX","IMPORTANT"],"snippet":"Hi there, this is a preview","payload":{"headers":[{"name":"Subject","value":"Weekly update"},{"name":"From","value":"sally@example.com"}]}}' >/dev/null 2>&1
+aux4 google gmail get 18abc123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18972/api
+```
+
+```expect:partial
+"id":"18abc123"
+```
+
 ### should GET the message resource with the default full format
 
 ```execute
-aux4 google gmail get 18abc123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18972 | aux4 json get --path '$.path'
+aux4 mock verify --port 18972 --method GET --path /users/me/messages/18abc123
+```
+
+```expect:partial
+verify ok
+```
+
+### should request the full format by default
+
+```execute
+aux4 mock requests --port 18972 --method GET --path /users/me/messages/18abc123 | aux4 json get --path '$.0.query.format'
 ```
 
 ```expect
-"/users/me/messages/18abc123?format=full"
+"full"
 ```
 
 ### should send a bearer token and no request body
 
 ```execute
-aux4 google gmail get 18abc123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18972
+aux4 mock verify --port 18972 --method GET --path /users/me/messages/18abc123 --header "authorization=Bearer test-access-token"
 ```
 
 ```expect:partial
-"method": "GET"
-```
-
-```expect:partial
-"authorization": "Bearer test-access-token"
+verify ok
 ```
 
 ### should honor the requested format
 
 ```execute
-aux4 google gmail get 18abc123 --format metadata --tokenFile google-token.json --apiUrl http://127.0.0.1:18972 | aux4 json get --path '$.path'
+aux4 mock reset --port 18972 --requests >/dev/null 2>&1
+aux4 google gmail get 18abc123 --format metadata --tokenFile google-token.json --apiUrl http://127.0.0.1:18972/api >/dev/null 2>&1
+aux4 mock requests --port 18972 --method GET --path /users/me/messages/18abc123 | aux4 json get --path '$.0.query.format'
 ```
 
 ```expect
-"/users/me/messages/18abc123?format=metadata"
+"metadata"
 ```
 
 ## without a stored token
@@ -67,7 +89,7 @@ aux4 google gmail get 18abc123 --format metadata --tokenFile google-token.json -
 ### should report that the google provider has no token
 
 ```execute
-aux4 google gmail get 18abc123 --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18972
+aux4 google gmail get 18abc123 --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18972/api
 ```
 
 ```error:partial

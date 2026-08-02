@@ -1,19 +1,19 @@
 # google gmail trash
 
-Part of the `core` group in `test.suite.md`. The Gmail API is replaced by a local
-echo server so the trash request can be asserted without touching a real mailbox.
-`trash` moves one or more messages to the Bin via `users.messages.batchModify`
-(adding the `TRASH` label — reversible), guarded by a `confirm:` prompt that
-`--yes` bypasses.
+Part of the `core` group in `test.suite.md`. The Gmail API is replaced by an
+`aux4/mock` server, so the trash request is asserted with `aux4 mock verify`
+without touching a real mailbox. `trash` moves one or more messages to the Bin via
+`users.messages.batchModify` (adding the `TRASH` label — reversible), guarded by a
+`confirm:` prompt that `--yes` bypasses.
 
 ## against a local mock API
 
 ```beforeAll
-nohup node mock-echo.js 18973 >/dev/null 2>&1 &
-for i in $(seq 1 40); do curl -s -o /dev/null http://127.0.0.1:18973/ 2>/dev/null && break; sleep 0.25; done
+aux4 aux4 pkger install aux4/mock
 ```
 
 ```afterAll
+aux4 mock stop --port 18973 2>/dev/null
 pkill -f "18973" 2>/dev/null
 ```
 
@@ -30,48 +30,39 @@ pkill -f "18973" 2>/dev/null
 }
 ```
 
-### should POST a single message to batchModify with the TRASH label
+### should confirm the messages were moved to Trash
 
 ```execute
-aux4 google gmail trash --id 18abc123 --yes true --tokenFile google-token.json --apiUrl http://127.0.0.1:18973
+aux4 mock start --port 18973 >/dev/null 2>&1
+sleep 1
+printf '' | aux4 mock stub --port 18973 --method POST --path /users/me/messages/batchModify --status 204 >/dev/null 2>&1
+aux4 google gmail trash --id 18abc123 --yes true --tokenFile google-token.json --apiUrl http://127.0.0.1:18973/api
 ```
 
 ```expect:partial
-"method": "POST"
+Trash
+```
+
+### should POST a single message to batchModify with the TRASH label and a bearer token
+
+```execute
+aux4 mock verify --port 18973 --method POST --path /users/me/messages/batchModify --header "authorization=Bearer test-access-token" --body-contains '18abc123' --body-contains '"addLabelIds":["TRASH"]'
 ```
 
 ```expect:partial
-"path": "/users/me/messages/batchModify"
-```
-
-```expect:partial
-"authorization": "Bearer test-access-token"
-```
-
-```expect:partial
-"18abc123"
-```
-
-```expect:partial
-"TRASH"
+verify ok
 ```
 
 ### should trash multiple messages in one batchModify call
 
 ```execute
-aux4 google gmail trash --id 18abc123 --id 29def456 --yes true --tokenFile google-token.json --apiUrl http://127.0.0.1:18973
+aux4 mock reset --port 18973 --requests >/dev/null 2>&1
+aux4 google gmail trash --id 18abc123 --id 29def456 --yes true --tokenFile google-token.json --apiUrl http://127.0.0.1:18973/api >/dev/null 2>&1
+aux4 mock verify --port 18973 --method POST --path /users/me/messages/batchModify --body-contains '18abc123' --body-contains '29def456'
 ```
 
 ```expect:partial
-"path": "/users/me/messages/batchModify"
-```
-
-```expect:partial
-"18abc123"
-```
-
-```expect:partial
-"29def456"
+verify ok
 ```
 
 ## confirmation guard
@@ -79,11 +70,22 @@ aux4 google gmail trash --id 18abc123 --id 29def456 --yes true --tokenFile googl
 ### should abort without --yes and never call the API
 
 ```execute
-aux4 google gmail trash --id 18abc123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18973 </dev/null
+aux4 mock reset --port 18973 --requests >/dev/null 2>&1
+aux4 google gmail trash --id 18abc123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18973/api </dev/null
 ```
 
 ```error:partial
 User aborted
+```
+
+### should not have recorded any batchModify request after aborting
+
+```execute
+aux4 mock verify --port 18973 --method POST --path /users/me/messages/batchModify
+```
+
+```error:partial
+verify failed
 ```
 
 ## without a stored token
@@ -91,7 +93,7 @@ User aborted
 ### should report that the google provider has no token
 
 ```execute
-aux4 google gmail trash --id 18abc123 --yes true --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18973
+aux4 google gmail trash --id 18abc123 --yes true --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18973/api
 ```
 
 ```error:partial

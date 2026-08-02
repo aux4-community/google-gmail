@@ -1,16 +1,17 @@
 # google gmail labels list
 
-Part of the `core` group in `test.suite.md`. The Gmail API is replaced by a local
-echo server so the labels request can be asserted without a real mailbox.
+Part of the `core` group in `test.suite.md`. The Gmail API is replaced by an
+`aux4/mock` server, so the command runs against a realistic labels list while the
+GET request is asserted with `aux4 mock verify` — without a real mailbox.
 
 ## against a local mock API
 
 ```beforeAll
-nohup node mock-echo.js 18974 >/dev/null 2>&1 &
-for i in $(seq 1 40); do curl -s -o /dev/null http://127.0.0.1:18974/ 2>/dev/null && break; sleep 0.25; done
+aux4 aux4 pkger install aux4/mock
 ```
 
 ```afterAll
+aux4 mock stop --port 18974 2>/dev/null
 pkill -f "18974" 2>/dev/null
 ```
 
@@ -27,22 +28,27 @@ pkill -f "18974" 2>/dev/null
 }
 ```
 
+### should return the labels from the API
+
+```execute
+aux4 mock start --port 18974 >/dev/null 2>&1
+sleep 1
+aux4 mock stub --port 18974 --method GET --path /users/me/labels --status 200 --body '{"labels":[{"id":"INBOX","name":"INBOX","type":"system"},{"id":"SENT","name":"SENT","type":"system"},{"id":"Label_1","name":"Work","type":"user"}]}' >/dev/null 2>&1
+aux4 google gmail labels list --tokenFile google-token.json --apiUrl http://127.0.0.1:18974/api
+```
+
+```expect:partial
+"name":"Work"
+```
+
 ### should GET the labels resource with a bearer token
 
 ```execute
-aux4 google gmail labels list --tokenFile google-token.json --apiUrl http://127.0.0.1:18974
+aux4 mock verify --port 18974 --method GET --path /users/me/labels --header "authorization=Bearer test-access-token"
 ```
 
 ```expect:partial
-"method": "GET"
-```
-
-```expect:partial
-"path": "/users/me/labels"
-```
-
-```expect:partial
-"authorization": "Bearer test-access-token"
+verify ok
 ```
 
 ## without a stored token
@@ -50,7 +56,7 @@ aux4 google gmail labels list --tokenFile google-token.json --apiUrl http://127.
 ### should report that the google provider has no token
 
 ```execute
-aux4 google gmail labels list --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18974
+aux4 google gmail labels list --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18974/api
 ```
 
 ```error:partial
