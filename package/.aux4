@@ -73,7 +73,7 @@
           "name": "send",
           "execute": [
             "set:rawFile=!mktemp -t aux4-gmail.XXXXXXXX",
-            "stdin:node ${packageDir}/lib/gmail.mjs mime values(to, subject, content, from, cc, bcc, html) > ${rawFile}",
+            "stdin:node ${packageDir}/lib/gmail.mjs mime values(to, subject, body, from, cc, bcc, html) > ${rawFile}",
             "set:raw=!cat ${rawFile}",
             "rm -f value(rawFile)",
             "set:requestPath=/users/me/messages/send",
@@ -94,7 +94,7 @@
                 "default": ""
               },
               {
-                "name": "content",
+                "name": "body",
                 "text": "Message body. If omitted, the body is read from stdin (a pipe)",
                 "default": ""
               },
@@ -196,7 +196,7 @@
           "name": "get",
           "execute": [
             "set:requestUrl=${apiUrl}/users/me/messages/${messageId}?format=${format}",
-            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl)"
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl) | node ${packageDir}/lib/gmail.mjs decode"
           ],
           "help": {
             "text": "Get a single message by ID",
@@ -275,6 +275,74 @@
           ],
           "help": {
             "text": "Gmail label commands"
+          }
+        },
+        {
+          "name": "attachments",
+          "execute": [
+            "set:requestUrl=${apiUrl}/users/me/messages/${messageId}?format=full",
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl) | node ${packageDir}/lib/gmail.mjs attachments"
+          ],
+          "help": {
+            "text": "List the attachments on a message: filename, attachmentId, mimeType and size",
+            "variables": [
+              {
+                "name": "messageId",
+                "text": "Id of the message whose attachments to list",
+                "arg": true
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "download",
+          "execute": [
+            "set:requestUrl=${apiUrl}/users/me/messages/${messageId}/attachments/${attachmentId}",
+            "aux4 curl auth-request --provider google param(tokenFile) --url value(requestUrl) | node ${packageDir}/lib/gmail.mjs save value(output)"
+          ],
+          "help": {
+            "text": "Download one attachment to a file. Get its attachmentId from `gmail attachments`",
+            "variables": [
+              {
+                "name": "messageId",
+                "text": "Id of the message the attachment belongs to",
+                "arg": true
+              },
+              {
+                "name": "attachmentId",
+                "text": "Id of the attachment, as reported by `gmail attachments`"
+              },
+              {
+                "name": "output",
+                "text": "Path to write the attachment to"
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
           }
         }
       ]

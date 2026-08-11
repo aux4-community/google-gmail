@@ -45,7 +45,7 @@ aux4 google gmail list --maxResults 3
 ### should send a message to the configured test address
 
 ```execute
-aux4 google gmail send ${GMAIL_TEST_TO} --subject "aux4 gmail integration test" --content "Sent by the community/google-gmail integration test."
+aux4 google gmail send ${GMAIL_TEST_TO} --subject "aux4 gmail integration test" --body "Sent by the community/google-gmail integration test."
 ```
 
 ```expect:partial

@@ -2,7 +2,7 @@
 
 The `send` command composes an email and sends it through the Gmail API. It builds an RFC 2822 MIME message from the flags you provide — recipient, subject, and body — base64url-encodes it, and posts it to the `messages.send` endpoint of the authenticated account.
 
-The body is given with `--content`. It is sent as `text/plain` by default; add `--html true` to send it as `text/html`. If `--content` is omitted, the body is read from **stdin**, so you can pipe a file in: `cat body.html | aux4 google gmail send ... --html true`. Either way, `--html` decides the content type.
+The body is given with `--body`. It is sent as `text/plain` by default; add `--html true` to send it as `text/html`. If `--body` is omitted, the body is read from **stdin**, so you can pipe a file in: `cat body.html | aux4 google gmail send ... --html true`. Either way, `--html` decides the content type.
 
 The `--from` header is optional; Gmail uses the authenticated account when it is omitted. Multiple `--cc` or `--bcc` recipients are given as a comma-separated list.
 
@@ -11,12 +11,12 @@ To continue an existing conversation, pass `--threadId`. The message is then att
 #### Usage
 
 ```bash
-aux4 google gmail send <to> [--subject <text>] [--content <body>] [--html true] [--from <email>] [--cc <emails>] [--bcc <emails>] [--threadId <id>] [--tokenFile <path>]
+aux4 google gmail send <to> [--subject <text>] [--body <text>] [--html true] [--from <email>] [--cc <emails>] [--bcc <emails>] [--threadId <id>] [--tokenFile <path>]
 ```
 
 to           Recipient email address (required)
 --subject    Message subject line
---content    Message body. If omitted, the body is read from stdin (a pipe)
+--body       Message body. If omitted, the body is read from stdin (a pipe)
 --html       Send the body as HTML (`text/html`) instead of plain text
 --from       Sender email address (defaults to the authenticated account)
 --cc         Comma-separated CC recipients
@@ -27,7 +27,7 @@ to           Recipient email address (required)
 #### Example
 
 ```bash
-aux4 google gmail send person@example.com --subject "Weekly update" --content "Here is the update."
+aux4 google gmail send person@example.com --subject "Weekly update" --body "Here is the update."
 ```
 
 ```text
@@ -41,7 +41,7 @@ aux4 google gmail send person@example.com --subject "Weekly update" --content "H
 Send an HTML message with a CC recipient:
 
 ```bash
-aux4 google gmail send person@example.com --subject "Report" --content "<h1>Report</h1><p>See attached numbers.</p>" --html true --cc team@example.com
+aux4 google gmail send person@example.com --subject "Report" --body "<h1>Report</h1><p>See attached numbers.</p>" --html true --cc team@example.com
 ```
 
 Pipe an HTML file in as the body:
@@ -53,5 +53,5 @@ cat newsletter.html | aux4 google gmail send list@example.com --subject "This we
 Reply within an existing thread:
 
 ```bash
-aux4 google gmail send person@example.com --subject "Re: Weekly update" --content "Thanks!" --threadId 18abc123def456
+aux4 google gmail send person@example.com --subject "Re: Weekly update" --body "Thanks!" --threadId 18abc123def456
 ```

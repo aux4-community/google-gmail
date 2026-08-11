@@ -37,7 +37,7 @@ pkill -f "18970" 2>/dev/null
 aux4 mock start --port 18970 >/dev/null 2>&1
 sleep 1
 aux4 mock stub --port 18970 --method POST --path /users/me/messages/send --status 200 --body '{"id":"18f8a9b0c1d2e3f4","threadId":"18f8a9b0c1d2e3f4","labelIds":["SENT"]}' >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Hello" --content "Hi there" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api
+aux4 google gmail send person@example.com --subject "Hello" --body "Hi there" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api
 ```
 
 ```expect:partial
@@ -58,7 +58,7 @@ verify ok
 
 ```execute
 aux4 mock reset --port 18970 --requests >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Weekly update" --content "Hi there" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Weekly update" --body "Hi there" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
 B=$(aux4 mock requests --port 18970 --method POST --path /users/me/messages/send | aux4 json get --path '$.0.body' | grep -oE '[A-Za-z0-9_-]{40,}' | tr -- '-_' '+/'); while [ $(( ${#B} % 4 )) -ne 0 ]; do B="${B}="; done; printf '%s' "$B" | base64 -d
 ```
 
@@ -78,7 +78,7 @@ Content-Type: text/plain; charset=
 
 ```execute
 aux4 mock reset --port 18970 --requests >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Hi" --content "Body" --from me@example.com --cc team@example.com --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Hi" --body "Body" --from me@example.com --cc team@example.com --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
 B=$(aux4 mock requests --port 18970 --method POST --path /users/me/messages/send | aux4 json get --path '$.0.body' | grep -oE '[A-Za-z0-9_-]{40,}' | tr -- '-_' '+/'); while [ $(( ${#B} % 4 )) -ne 0 ]; do B="${B}="; done; printf '%s' "$B" | base64 -d
 ```
 
@@ -94,7 +94,7 @@ Cc: team@example.com
 
 ```execute
 aux4 mock reset --port 18970 --requests >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Report" --content "<h1>Report</h1>" --html true --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Report" --body "<h1>Report</h1>" --html true --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
 B=$(aux4 mock requests --port 18970 --method POST --path /users/me/messages/send | aux4 json get --path '$.0.body' | grep -oE '[A-Za-z0-9_-]{40,}' | tr -- '-_' '+/'); while [ $(( ${#B} % 4 )) -ne 0 ]; do B="${B}="; done; printf '%s' "$B" | base64 -d
 ```
 
@@ -142,7 +142,7 @@ plain body from stdin
 
 ```execute
 aux4 mock reset --port 18970 --requests >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Re: Hi" --content "Reply body" --threadId THREAD123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Re: Hi" --body "Reply body" --threadId THREAD123 --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
 aux4 mock verify --port 18970 --method POST --path /users/me/messages/send --body-contains '"threadId":"THREAD123"'
 ```
 
@@ -154,7 +154,7 @@ verify ok
 
 ```execute
 aux4 mock reset --port 18970 --requests >/dev/null 2>&1
-aux4 google gmail send person@example.com --subject "Hi" --content "Body" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Hi" --body "Body" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
 aux4 mock verify --port 18970 --method POST --path /users/me/messages/send --body-contains 'threadId'
 ```
 
@@ -162,12 +162,39 @@ aux4 mock verify --port 18970 --method POST --path /users/me/messages/send --bod
 missing body substring(s): [threadId]
 ```
 
+### should carry the --body text into the message
+
+The message text is given with `--body` — the name most mail tools use for it.
+
+```execute
+aux4 mock reset --port 18970 --requests >/dev/null 2>&1
+aux4 google gmail send person@example.com --subject "Hi" --body "The body text" --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api >/dev/null 2>&1
+aux4 mock requests --port 18970 --method POST --path /users/me/messages/send | python3 -c "import json,sys,base64;r=json.load(sys.stdin)[0];print(base64.urlsafe_b64decode(json.loads(r['body'])['raw']+'==').decode())"
+```
+
+```expect:partial
+The body text
+```
+
+### should refuse to send a message with no subject and no body
+
+Without this the send would silently succeed with an empty body — which also masks the common
+mistake of passing the text under an unknown flag, so it never arrives. The error names the flag.
+
+```execute
+aux4 google gmail send person@example.com --tokenFile google-token.json --apiUrl http://127.0.0.1:18970/api < /dev/null
+```
+
+```error:partial
+nothing to send
+```
+
 ## without a stored token
 
 ### should report that the google provider has no token
 
 ```execute
-aux4 google gmail send person@example.com --subject "Hi" --content "Body" --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18970/api
+aux4 google gmail send person@example.com --subject "Hi" --body "Body" --tokenFile ./no-such-directory/google.json --apiUrl http://127.0.0.1:18970/api
 ```
 
 ```error:partial

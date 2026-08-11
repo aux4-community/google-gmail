@@ -39,7 +39,7 @@ aux4 google auth status
 Send an email:
 
 ```bash
-aux4 google gmail send person@example.com --subject "Hello" --content "Hi there"
+aux4 google gmail send person@example.com --subject "Hello" --body "Hi there"
 ```
 
 List unread messages:
@@ -56,23 +56,23 @@ aux4 google gmail get 18abc123def456
 
 ## Sending mail
 
-The body is given with `--content` and defaults to plain text; add `--html true` to send it as HTML.
+The body is given with `--body` and defaults to plain text; add `--html true` to send it as HTML.
 
 ### Plain text
 
 ```bash
-aux4 google gmail send person@example.com --subject "Weekly update" --content "Here is the update."
+aux4 google gmail send person@example.com --subject "Weekly update" --body "Here is the update."
 ```
 
 ### HTML
 
 ```bash
-aux4 google gmail send person@example.com --subject "Report" --content "<h1>Report</h1><p>See the numbers below.</p>" --html true
+aux4 google gmail send person@example.com --subject "Report" --body "<h1>Report</h1><p>See the numbers below.</p>" --html true
 ```
 
 ### Body from stdin
 
-If you omit `--content`, the body is read from **stdin** — so you can pipe a file straight in. It's plain text by default; add `--html true` to send the piped content as HTML:
+If you omit `--body`, the body is read from **stdin** — so you can pipe a file straight in. It's plain text by default; add `--html true` to send the piped content as HTML:
 
 ```bash
 cat body.txt   | aux4 google gmail send person@example.com --subject "Notes"
@@ -84,7 +84,7 @@ cat email.html | aux4 google gmail send list@example.com --subject "This week" -
 `--cc` and `--bcc` accept a comma-separated list of addresses:
 
 ```bash
-aux4 google gmail send person@example.com --subject "Kickoff" --content "See you Monday" --cc team@example.com --bcc archive@example.com
+aux4 google gmail send person@example.com --subject "Kickoff" --body "See you Monday" --cc team@example.com --bcc archive@example.com
 ```
 
 ### Replying within a thread
@@ -92,7 +92,7 @@ aux4 google gmail send person@example.com --subject "Kickoff" --content "See you
 Pass the `--threadId` of the conversation so the message is attached to it instead of starting a new thread:
 
 ```bash
-aux4 google gmail send person@example.com --subject "Re: Weekly update" --content "Thanks!" --threadId 18abc123def456
+aux4 google gmail send person@example.com --subject "Re: Weekly update" --body "Thanks!" --threadId 18abc123def456
 ```
 
 The `--from` header is optional — Gmail uses the authenticated account when it is omitted.
@@ -120,6 +120,50 @@ Use `--format` to control how much is returned — `full` (default), `metadata` 
 ```bash
 aux4 google gmail get 18abc123def456 --format metadata
 ```
+
+### The message text
+
+Gmail returns message bodies base64url-encoded inside `payload`, and the API has no "just give me
+the text" mode. `get` decodes it for you: the message comes back with a top-level `text` field
+holding the body, and every text part carries its decoded content alongside the raw data.
+
+```bash
+aux4 google gmail get 18abc123def456 | aux4 json get --path '$.text'
+```
+
+```text
+"Hi -- can we meet on 12 March at 14:00 to go through the Q3 budget?"
+```
+
+The original `payload` is left untouched, so anything already reading `body.data` keeps working.
+On a multipart message the top-level `text` is the `text/plain` part, falling back to `text/html`.
+
+## Attachments
+
+Attachment bytes do not come with the message — Gmail returns an id per attached part, which is
+fetched separately. List what is attached first:
+
+```bash
+aux4 google gmail attachments 18abc123def456
+```
+
+```text
+[{"filename":"invoice.pdf","attachmentId":"att-77","mimeType":"application/pdf","size":18240}]
+```
+
+Then download one by its id. The bytes are decoded on the way out, so what lands on disk is a
+usable file:
+
+```bash
+aux4 google gmail download 18abc123def456 --attachmentId att-77 --output invoice.pdf
+```
+
+```text
+invoice.pdf
+```
+
+The filename in the listing is the sender's; `--output` is where you want it written, and the two
+need not match. A message with nothing attached lists `[]`.
 
 ## Moving messages to the Bin
 
