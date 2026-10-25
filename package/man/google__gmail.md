@@ -1,6 +1,6 @@
 #### Description
 
-The `google gmail` command group provides access to a Gmail mailbox through the Gmail API. Every request is signed with the shared Google OAuth2 token that `community/google-auth` maintains, so there is nothing to configure beyond a single login.
+The `google gmail` command group is your email: read, search, send and manage the messages in your Gmail inbox (and its labels and attachments) through the Gmail API. Every request is signed with the shared Google OAuth2 token that `community/google-auth` maintains, so there is nothing to configure beyond a single login.
 
 Available subcommands:
 

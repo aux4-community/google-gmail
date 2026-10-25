@@ -51,7 +51,7 @@
             "profile:google:gmail"
           ],
           "help": {
-            "text": "Gmail commands"
+            "text": "Gmail: read, search, send and manage your email (inbox messages, labels, attachments)"
           }
         }
       ]
