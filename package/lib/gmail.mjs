@@ -143,6 +143,16 @@ function buildTrashBody(rawIds) {
   return JSON.stringify({ ids, addLabelIds: ["TRASH"] });
 }
 
+// Build a batchModify body that archives messages by removing the INBOX label.
+// Messages stay in the mailbox and can be returned to the inbox later.
+function buildArchiveBody(rawIds) {
+  const ids = parseMultiValue(rawIds);
+  if (ids.length === 0) {
+    fail("archive: at least one message id is required");
+  }
+  return JSON.stringify({ ids, removeLabelIds: ["INBOX"] });
+}
+
 
 // Gmail returns message bodies base64url-encoded inside `payload`, and the API
 // has no "give me the text" mode. Passing that straight through means anyone
@@ -306,6 +316,10 @@ if (mode === "mime") {
   // Repeatable value comes as one JSON-array arg; join defensively in case a
   // shell ever splits it into several.
   process.stdout.write(buildTrashBody(rest.length > 1 ? rest.join("\n") : rest[0]));
+} else if (mode === "archivebody") {
+  // Repeatable value comes as one JSON-array arg; join defensively in case a
+  // shell ever splits it into several.
+  process.stdout.write(buildArchiveBody(rest.length > 1 ? rest.join("\n") : rest[0]));
 } else {
   fail(`unknown mode: ${mode}`);
 }

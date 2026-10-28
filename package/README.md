@@ -2,7 +2,7 @@
 
 Commands to send, read and manage Gmail messages using the Gmail API
 
-This package provides aux4 command wrappers for the [Gmail API](https://developers.google.com/gmail/api). It covers sending email (plain text or HTML, with CC/BCC and thread replies), listing and reading messages, moving messages to the trash, and listing labels.
+This package provides aux4 command wrappers for the [Gmail API](https://developers.google.com/gmail/api). It covers sending email (plain text or HTML, with CC/BCC and thread replies), listing and reading messages, archiving or moving messages to the trash, and listing labels.
 
 Authentication is handled by [community/google-auth](https://hub.aux4.io/package/community/google-auth), which stores a single OAuth2 token shared by every aux4 Google package.
 
@@ -20,13 +20,13 @@ Authenticate once with `community/google-auth`. The scopes are resolved from the
 aux4 google auth login
 ```
 
-This package requests `https://www.googleapis.com/auth/gmail.modify`, which allows sending, reading, and managing messages (moving to trash, changing labels). If you only need to read, request the narrower read-only scope instead:
+This package requests `https://www.googleapis.com/auth/gmail.modify`, which allows sending, reading, and managing messages (archiving, moving to trash, changing labels). If you only need to read, request the narrower read-only scope instead:
 
 ```bash
 aux4 google auth login --readonly true
 ```
 
-That requests `https://www.googleapis.com/auth/gmail.readonly`. Note that `send` and `trash` need the full `gmail.modify` scope and will fail with a read-only token.
+That requests `https://www.googleapis.com/auth/gmail.readonly`. Note that `send`, `archive`, and `trash` need the full `gmail.modify` scope and will fail with a read-only token.
 
 Check the current state at any time:
 
@@ -164,6 +164,20 @@ invoice.pdf
 
 The filename in the listing is the sender's; `--output` is where you want it written, and the two
 need not match. A message with nothing attached lists `[]`.
+
+## Archiving messages
+
+Archive removes a message from the inbox while keeping it in the mailbox. It can be returned to the inbox later. Pass `--id` once for each message; all IDs are sent in one request:
+
+```bash
+aux4 google gmail archive --id 18abc123def456 --id 19def456abc789
+```
+
+```text
+Archived the selected message(s) from the inbox.
+```
+
+Archiving is different from moving a message to the Bin: archived messages remain in the mailbox and are searchable, while trashed messages are in the Bin.
 
 ## Moving messages to the Bin
 

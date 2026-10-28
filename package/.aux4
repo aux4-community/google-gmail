@@ -1,7 +1,7 @@
 {
   "scope": "community",
   "name": "google-gmail",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Commands to send, read and manage Gmail messages using the Gmail API",
   "license": "MIT",
   "tags": [
@@ -249,6 +249,40 @@
               {
                 "name": "id",
                 "text": "Message ID to move to the trash (repeatable: --id A --id B)",
+                "arg": true,
+                "multiple": true
+              },
+              {
+                "name": "tokenFile",
+                "text": "Where the Google OAuth token is stored",
+                "default": "${aux4HomeDir}/.oauth/google.json",
+                "env": "AUX4_GOOGLE_TOKEN_FILE"
+              },
+              {
+                "name": "apiUrl",
+                "text": "Gmail API base URL",
+                "default": "https://gmail.googleapis.com/gmail/v1",
+                "env": "GMAIL_API_URL",
+                "private": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "archive",
+          "execute": [
+            "set:archiveBody=!node ${packageDir}/lib/gmail.mjs archivebody values(id*)",
+            "set:requestPath=/users/me/messages/batchModify",
+            "set:requestUrl=${apiUrl}${requestPath}",
+            "aux4 curl auth-request --provider google param(tokenFile) --method POST --header 'Content-Type: application/json' --url value(requestUrl) --body param(archiveBody:body)",
+            "log:Archived the selected message(s) from the inbox."
+          ],
+          "help": {
+            "text": "Archive one or more messages by removing the INBOX label",
+            "variables": [
+              {
+                "name": "id",
+                "text": "Message ID to archive (repeatable: --id A --id B)",
                 "arg": true,
                 "multiple": true
               },

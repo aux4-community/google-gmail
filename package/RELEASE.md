@@ -1,5 +1,11 @@
 # Release notes
 
+## Archive messages
+
+`aux4 google gmail archive --id <message-id>` removes the `INBOX` label and keeps the message
+in Gmail's All Mail. It accepts repeated `--id` flags so matching messages can be archived in one
+request; `trash` remains the separate destructive action.
+
 ## `get` returns the email, not base64
 
 `gmail get` now decodes the message body for you. The result carries a top-level `text` field
